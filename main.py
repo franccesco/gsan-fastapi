@@ -22,23 +22,7 @@ def clean_domains(domains, seen_domains=None):
     return list(cleaned_domains), seen_domains
 
 
-@app.get("/ssl_domains/{hostname}")
-async def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443):
-    seen_domains = set()
-    domains, seen_domains = await get_domains(hostname, port, seen_domains)
-    sub_domains = []
-    if recursive:
-        for domain in domains:
-            if domain != hostname:
-                try:
-                    new_sub_domains, seen_domains = await get_domains(domain, port, seen_domains)
-                    sub_domains.extend(new_sub_domains)
-                except HTTPException:
-                    continue
-    return {"domains": domains + sub_domains}
-
-
-async def get_domains(hostname: str, port: int, seen_domains):
+def get_domains(hostname: str, port: int, seen_domains):
     try:
         context = ssl.create_default_context()
         with socket.create_connection((hostname, port)) as sock:
@@ -49,3 +33,19 @@ async def get_domains(hostname: str, port: int, seen_domains):
                 return cleaned_domains, seen_domains
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ssl_domains/{hostname}")
+def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443):
+    seen_domains = set()
+    domains, seen_domains = get_domains(hostname, port, seen_domains)
+    sub_domains = []
+    if recursive:
+        for domain in domains:
+            if domain != hostname:
+                try:
+                    new_sub_domains, seen_domains = get_domains(domain, port, seen_domains)
+                    sub_domains.extend(new_sub_domains)
+                except HTTPException:
+                    continue
+    return {"domains": domains + sub_domains}
