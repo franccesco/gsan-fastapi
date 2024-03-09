@@ -7,7 +7,17 @@ from fastapi import HTTPException
 app = FastAPI()
 
 
-def clean_domains(domains, seen_domains=None):
+def clean_domains(domains, seen_domains=None) -> tuple:
+    """
+    Clean a list of domains by removing duplicates and common prefixes.
+
+    Args:
+        domains (list): A list of domain names.
+        seen_domains (set, optional): A set of previously seen domain names. Defaults to None.
+
+    Returns:
+        tuple: A tuple containing a list of cleaned domain names and a set of seen domain names.
+    """
     if seen_domains is None:
         seen_domains = set()
     cleaned_domains = set()
@@ -22,7 +32,21 @@ def clean_domains(domains, seen_domains=None):
     return list(cleaned_domains), seen_domains
 
 
-def get_domains(hostname: str, port: int, seen_domains):
+def get_domains(hostname: str, port: int, seen_domains) -> tuple:
+    """
+    Retrieves the domains from the SSL certificate of the specified hostname and port.
+
+    Args:
+        hostname (str): The hostname of the server.
+        port (int): The port number of the server.
+        seen_domains: A list of domains that have already been seen.
+
+    Returns:
+        Tuple[List[str], List[str]]: A tuple containing the cleaned domains and the updated list of seen domains.
+
+    Raises:
+        HTTPException: If an error occurs while retrieving the domains.
+    """
     try:
         context = ssl.create_default_context()
         with socket.create_connection((hostname, port)) as sock:
