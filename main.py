@@ -3,16 +3,15 @@ import ssl
 import socket
 from os import environ
 
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Header
 
 app = FastAPI()
 
 
-def get_api_key():
-    try:
-        return environ["API_KEY"]
-    except KeyError:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key not set")
+def get_api_key(api_key: str = Header(None)):
+    if api_key is None or api_key != environ.get("API_KEY"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    return api_key
 
 
 def clean_domains(domains, seen_domains=None) -> tuple:
