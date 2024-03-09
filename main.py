@@ -1,10 +1,18 @@
 from fastapi import FastAPI
 import ssl
 import socket
+from os import environ
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends, status
 
 app = FastAPI()
+
+
+def get_api_key():
+    try:
+        return environ["API_KEY"]
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key not set")
 
 
 def clean_domains(domains, seen_domains=None) -> tuple:
@@ -56,11 +64,11 @@ def get_domains(hostname: str, port: int, seen_domains) -> tuple:
                 cleaned_domains, seen_domains = clean_domains(domains, seen_domains)
                 return cleaned_domains, seen_domains
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.get("/ssl_domains/{hostname}")
-def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443):
+def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443, api_key: str = Depends(get_api_key)):
     seen_domains = set()
     domains, seen_domains = get_domains(hostname, port, seen_domains)
     sub_domains = []
