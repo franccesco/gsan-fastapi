@@ -43,12 +43,30 @@ api_key_header = APIKeyHeader(name="X-API-Key")
 
 
 def get_api_key(api_key: str = Depends(api_key_header)):
+    """
+    Validates the API key provided in the request header.
+
+    Args:
+        api_key (str): The API key extracted from the request header.
+
+    Returns:
+        str: The validated API key.
+
+    Raises:
+        HTTPException: If the API key is invalid or missing.
+    """
     if api_key is None or api_key != environ.get("API_KEY"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     return api_key
 
 
 def allow_unsigned_certificate():
+    """
+    Creates and returns an SSL context that allows the use of unsigned certificates.
+
+    Returns:
+        ssl.SSLContext: An SSL context with the hostname verification disabled and certificate verification set to none.
+    """
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
@@ -81,6 +99,19 @@ def clean_domains(domains, seen_domains=None) -> tuple:
 
 
 def get_domains(hostname: str, port: int, seen_domains: set):
+    """
+    Retrieves the subdomains or IP addresses associated with the SSL certificate.
+
+    Args:
+        hostname (str): The hostname to connect to.
+        port (int): The port number to connect to.
+        seen_domains (set): A set of previously seen domains.
+
+    Returns:
+        tuple: A tuple containing two elements:
+            - cleaned_domains (list): A list of cleaned subdomains and IP addresses.
+            - seen_domains (set): The updated set of seen domains.
+    """
     try:
         context = allow_unsigned_certificate()
         with socket.create_connection((hostname, port)) as sock:
@@ -112,6 +143,18 @@ def get_domains(hostname: str, port: int, seen_domains: set):
 
 @app.get("/ssl_domains/{hostname}")
 def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443, api_key: str = Depends(get_api_key)):
+    """
+    Retrieves SSL domains for a given hostname.
+
+    Args:
+        hostname (str): The hostname for which to retrieve SSL domains.
+        recursive (bool, optional): Flag indicating whether to recursively retrieve SSL domains for subdomains. Defaults to False.
+        port (int, optional): The port number to use for the SSL connection. Defaults to 443.
+        api_key (str, optional): The API key to use for authentication. Defaults to Depends(get_api_key).
+
+    Returns:
+        dict: A dictionary containing the retrieved SSL domains.
+    """
     seen_domains = set()
     domains, seen_domains = get_domains(hostname, port, seen_domains)
     sub_domains = []
