@@ -113,11 +113,17 @@ def get_domains(hostname: str, port: int, seen_domains: set, timeout: int):
             - seen_domains (set): The updated set of seen domains.
     """
     try:
+        # Create an SSL context that allows the use of unsigned certificates
         context = allow_unsigned_certificate()
+
         with socket.create_connection((hostname, port), timeout=timeout) as sock:
             with context.wrap_socket(sock, server_hostname=hostname) as ssl_sock:
+                # Retrieve the peer certificate in binary form and load it into an X.509 object
                 cert = ssl_sock.getpeercert(binary_form=True)
                 x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
+
+                # Extract the subdomains and IP addresses from the certificate's subjectAltName extension
+                # by iterating through the extensions and decoding the subjectAltName extension
                 subdomains = []
                 for extension_id in range(0, x509.get_extension_count()):
                     ext = x509.get_extension(extension_id)
@@ -130,11 +136,14 @@ def get_domains(hostname: str, port: int, seen_domains: set, timeout: int):
                                 for entry in range(len(name)):
                                     component = name.getComponentByPosition(entry)
                                     if "dNSName" in component:
+                                        # Add the domain name to the list of subdomains
                                         subdomains.append(str(component.getComponent()))
                                     elif "iPAddress" in component:
-                                        # Convert the IP address from bytes to a string.
+                                        # Convert the IP address from bytes to a string and add it to the list of subdomains
                                         ip_address = str(ipaddress.ip_address(component.getComponent()))
                                         subdomains.append(ip_address)
+
+                # Clean the subdomains by removing duplicates and common prefixes
                 cleaned_domains, seen_domains = clean_domains(subdomains, seen_domains)
                 return cleaned_domains, seen_domains
     except Exception as e:
