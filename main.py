@@ -4,6 +4,37 @@ import socket
 from os import environ
 
 from fastapi import HTTPException, Depends, status, Header
+from OpenSSL import crypto
+from pyasn1.codec.der import decoder
+from pyasn1.type import univ, char, namedtype, namedval, tag, constraint, useful
+
+
+class DNSName(univ.Choice):
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType(
+            "ia5String", char.IA5String().subtype(implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0))
+        )
+    )
+
+
+class IPAddress(univ.OctetString):
+    pass
+
+
+class GeneralName(univ.Choice):
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType(
+            "dNSName", char.IA5String().subtype(implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 2))
+        ),
+        namedtype.NamedType(
+            "iPAddress", IPAddress().subtype(implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 7))
+        ),
+    )
+
+
+class GeneralNames(univ.SequenceOf):
+    componentType = GeneralName()
+
 
 app = FastAPI()
 
@@ -12,6 +43,13 @@ def get_api_key(api_key: str = Header(None)):
     if api_key is None or api_key != environ.get("API_KEY"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     return api_key
+
+
+def allow_unsigned_certificate():
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
 
 
 def clean_domains(domains, seen_domains=None) -> tuple:
@@ -39,28 +77,31 @@ def clean_domains(domains, seen_domains=None) -> tuple:
     return list(cleaned_domains), seen_domains
 
 
-def get_domains(hostname: str, port: int, seen_domains) -> tuple:
-    """
-    Retrieves the domains from the SSL certificate of the specified hostname and port.
-
-    Args:
-        hostname (str): The hostname of the server.
-        port (int): The port number of the server.
-        seen_domains: A list of domains that have already been seen.
-
-    Returns:
-        Tuple[List[str], List[str]]: A tuple containing the cleaned domains and the updated list of seen domains.
-
-    Raises:
-        HTTPException: If an error occurs while retrieving the domains.
-    """
+def get_domains(hostname: str, port: int, seen_domains: set):
     try:
-        context = ssl.create_default_context()
+        context = allow_unsigned_certificate()
         with socket.create_connection((hostname, port)) as sock:
             with context.wrap_socket(sock, server_hostname=hostname) as ssl_sock:
-                cert = ssl_sock.getpeercert()
-                domains = [san[1] for san in cert["subjectAltName"] if san[0].startswith("DNS")]
-                cleaned_domains, seen_domains = clean_domains(domains, seen_domains)
+                cert = ssl_sock.getpeercert(binary_form=True)
+                x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
+                subdomains = []
+                for extension_id in range(0, x509.get_extension_count()):
+                    ext = x509.get_extension(extension_id)
+                    ext_name = ext.get_short_name().decode("utf-8")
+                    if ext_name == "subjectAltName":
+                        ext_data = ext.get_data()
+                        decoded_dat = decoder.decode(ext_data, asn1Spec=GeneralNames())
+                        for name in decoded_dat:
+                            if isinstance(name, GeneralNames):
+                                for entry in range(len(name)):
+                                    component = name.getComponentByPosition(entry)
+                                    if "dNSName" in component:
+                                        subdomains.append(str(component.getComponent()))
+                                    elif "iPAddress" in component:
+                                        # Convert the IP address from bytes to a string.
+                                        ip_address = str(ipaddress.ip_address(component.getComponent()))
+                                        subdomains.append(ip_address)
+                cleaned_domains, seen_domains = clean_domains(subdomains, seen_domains)
                 return cleaned_domains, seen_domains
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
