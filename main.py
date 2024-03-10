@@ -98,7 +98,7 @@ def clean_domains(domains, seen_domains=None) -> tuple:
     return list(cleaned_domains), seen_domains
 
 
-def get_domains(hostname: str, port: int, seen_domains: set):
+def get_domains(hostname: str, port: int, seen_domains: set, timeout: int):
     """
     Retrieves the subdomains or IP addresses associated with the SSL certificate.
 
@@ -114,7 +114,7 @@ def get_domains(hostname: str, port: int, seen_domains: set):
     """
     try:
         context = allow_unsigned_certificate()
-        with socket.create_connection((hostname, port)) as sock:
+        with socket.create_connection((hostname, port), timeout=timeout) as sock:
             with context.wrap_socket(sock, server_hostname=hostname) as ssl_sock:
                 cert = ssl_sock.getpeercert(binary_form=True)
                 x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
@@ -142,7 +142,9 @@ def get_domains(hostname: str, port: int, seen_domains: set):
 
 
 @app.get("/ssl_domains/{hostname}")
-def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443, api_key: str = Depends(get_api_key)):
+def get_ssl_domains(
+    hostname: str, recursive: bool = False, port: int = 443, timeout: int = 5, api_key: str = Depends(get_api_key)
+):
     """
     Retrieves SSL domains for a given hostname.
 
@@ -156,13 +158,13 @@ def get_ssl_domains(hostname: str, recursive: bool = False, port: int = 443, api
         dict: A dictionary containing the retrieved SSL domains.
     """
     seen_domains = set()
-    domains, seen_domains = get_domains(hostname, port, seen_domains)
+    domains, seen_domains = get_domains(hostname, port, seen_domains, timeout)
     sub_domains = []
     if recursive:
         for domain in domains:
             if domain != hostname:
                 try:
-                    new_sub_domains, seen_domains = get_domains(domain, port, seen_domains)
+                    new_sub_domains, seen_domains = get_domains(domain, port, seen_domains, timeout)
                     sub_domains.extend(new_sub_domains)
                 except HTTPException:
                     continue
