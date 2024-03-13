@@ -9,6 +9,10 @@ from pyasn1.codec.der import decoder
 from pyasn1.type import univ, char, namedtype, namedval, tag, constraint, useful
 from fastapi.security import APIKeyHeader
 from typing import List, Set
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.requests import Request
 import ipaddress
 
 
@@ -39,9 +43,11 @@ class GeneralNames(univ.SequenceOf):
     componentType = GeneralName()
 
 
-app = FastAPI()
-
 api_key_header = APIKeyHeader(name="X-API-Key")
+limiter = Limiter(key_func=get_remote_address)
+app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 def get_api_key(api_key: str = Depends(api_key_header)) -> str:
@@ -206,8 +212,14 @@ def get_domains_recursive(
 
 
 @app.get("/ssl_domains/{hostname}")
+@limiter.limit("300/minute")
 def get_ssl_domains(
-    hostname: str, recursive: bool = False, port: int = 443, timeout: int = 5, api_key: str = Depends(get_api_key)
+    request: Request,
+    hostname: str,
+    recursive: bool = False,
+    port: int = 443,
+    timeout: int = 5,
+    api_key: str = Depends(get_api_key),
 ) -> dict:
     """
     Retrieve SSL domains for a given hostname.
