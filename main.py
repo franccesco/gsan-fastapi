@@ -74,6 +74,16 @@ def allow_unsigned_certificate():
 
 
 def clean_domains(domains) -> tuple:
+    """
+    Cleans a list of domains by removing any leading "*. " or "www." prefixes.
+
+    Args:
+        domains (list): A list of domain names.
+
+    Returns:
+        list: A list of cleaned domain names.
+
+    """
     cleaned_domains = set()
     for domain in domains:
         if domain.startswith("*."):
@@ -85,6 +95,20 @@ def clean_domains(domains) -> tuple:
 
 
 def get_certificate(hostname: str, port: int, timeout: int):
+    """
+    Retrieves the X.509 certificate from the specified hostname and port.
+
+    Args:
+        hostname (str): The hostname of the server.
+        port (int): The port number of the server.
+        timeout (int): The timeout value for the connection.
+
+    Returns:
+        x509 (X509): The X.509 certificate object.
+
+    Raises:
+        HTTPException: If there is an error retrieving the certificate.
+    """
     try:
         # Create an SSL context that allows the use of unsigned certificates
         context = allow_unsigned_certificate()
@@ -101,6 +125,18 @@ def get_certificate(hostname: str, port: int, timeout: int):
 
 
 def extract_subdomains(x509):
+    """
+    Extracts subdomains and IP addresses from the certificate's subjectAltName extension.
+
+    Args:
+        x509 (X509): The X509 certificate object.
+
+    Returns:
+        list: A list of subdomains and IP addresses extracted from the certificate's subjectAltName extension.
+
+    Raises:
+        HTTPException: If an error occurs during the extraction process.
+    """
     try:
         # Extract the subdomains and IP addresses from the certificate's subjectAltName extension
         # by iterating through the extensions and decoding the subjectAltName extension
@@ -129,6 +165,19 @@ def extract_subdomains(x509):
 
 
 def get_domains_recursive(hostname, port, seen_domains, timeout, recursive):
+    """
+    Recursively retrieves subdomains from a given hostname.
+
+    Args:
+        hostname (str): The hostname to retrieve subdomains from.
+        port (int): The port number to use for the connection.
+        seen_domains (set): A set of already seen domains to avoid infinite recursion.
+        timeout (float): The timeout value for the connection.
+        recursive (bool): Flag indicating whether to recursively retrieve subdomains.
+
+    Returns:
+        list: A list of cleaned subdomains extracted from the given hostname.
+    """
     if hostname in seen_domains:
         return []
     seen_domains.add(hostname)
@@ -156,6 +205,19 @@ def get_domains_recursive(hostname, port, seen_domains, timeout, recursive):
 def get_ssl_domains(
     hostname: str, recursive: bool = False, port: int = 443, timeout: int = 5, api_key: str = Depends(get_api_key)
 ):
+    """
+    Retrieve SSL domains for a given hostname.
+
+    This endpoint returns a list of SSL domains associated with the specified hostname.
+    The `hostname` parameter is required and represents the target hostname.
+    The `recursive` parameter is optional and determines whether to recursively search for SSL domains.
+    The `port` parameter is optional and specifies the port to use for the SSL connection (default is 443).
+    The `timeout` parameter is optional and sets the timeout for the SSL connection (default is 5 seconds).
+    The `api_key` parameter is optional and represents the API key for authentication.
+
+    Returns:
+        A JSON containing the list of SSL domains.
+    """
     seen_domains = set()
     domains = get_domains_recursive(hostname, port, seen_domains, timeout, recursive)
     return {"domains": domains}
