@@ -8,6 +8,8 @@ from OpenSSL import crypto
 from pyasn1.codec.der import decoder
 from pyasn1.type import univ, char, namedtype, namedval, tag, constraint, useful
 from fastapi.security import APIKeyHeader
+from typing import List, Set
+import ipaddress
 
 
 class DNSName(univ.Choice):
@@ -42,7 +44,7 @@ app = FastAPI()
 api_key_header = APIKeyHeader(name="X-API-Key")
 
 
-def get_api_key(api_key: str = Depends(api_key_header)):
+def get_api_key(api_key: str = Depends(api_key_header)) -> str:
     """
     Validates the API key provided in the request header.
 
@@ -60,7 +62,7 @@ def get_api_key(api_key: str = Depends(api_key_header)):
     return api_key
 
 
-def allow_unsigned_certificate():
+def allow_unsigned_certificate() -> ssl.SSLContext:
     """
     Creates and returns an SSL context that allows the use of unsigned certificates.
 
@@ -73,7 +75,7 @@ def allow_unsigned_certificate():
     return context
 
 
-def clean_domains(domains) -> tuple:
+def clean_domains(domains: list) -> list:
     """
     Cleans a list of domains by removing any leading "*. " or "www." prefixes.
 
@@ -94,7 +96,7 @@ def clean_domains(domains) -> tuple:
     return list(cleaned_domains)
 
 
-def get_certificate(hostname: str, port: int, timeout: int):
+def get_certificate(hostname: str, port: int, timeout: int) -> crypto.X509:
     """
     Retrieves the X.509 certificate from the specified hostname and port.
 
@@ -124,7 +126,7 @@ def get_certificate(hostname: str, port: int, timeout: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-def extract_subdomains(x509):
+def extract_subdomains(x509: crypto.X509) -> list:
     """
     Extracts subdomains and IP addresses from the certificate's subjectAltName extension.
 
@@ -164,7 +166,9 @@ def extract_subdomains(x509):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-def get_domains_recursive(hostname, port, seen_domains, timeout, recursive):
+def get_domains_recursive(
+    hostname: str, port: int, seen_domains: Set[str], timeout: float, recursive: bool
+) -> List[str]:
     """
     Recursively retrieves subdomains from a given hostname.
 
@@ -204,7 +208,7 @@ def get_domains_recursive(hostname, port, seen_domains, timeout, recursive):
 @app.get("/ssl_domains/{hostname}")
 def get_ssl_domains(
     hostname: str, recursive: bool = False, port: int = 443, timeout: int = 5, api_key: str = Depends(get_api_key)
-):
+) -> dict:
     """
     Retrieve SSL domains for a given hostname.
 
