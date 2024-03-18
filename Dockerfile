@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8000
 
 # Start the FastAPI server
-CMD ["gunicorn", "main:app", "--worker-class", "uvicorn.workers.UvicornWorker", "-c", "gunicorn_conf.py", "-w", "4", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn", "gsan.main:app", "--worker-class", "uvicorn.workers.UvicornWorker", "-c", "gunicorn_conf.py", "-w", "4", "-b", "0.0.0.0:8000"]
