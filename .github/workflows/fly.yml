@@ -4,8 +4,8 @@ on:
     branches:
       - main
   pull_request:
-    branches:
-      - main
+    types:
+      - closed
 jobs:
   test:
     name: Run pytest
