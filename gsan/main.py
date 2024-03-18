@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 import ssl
 import socket
-from os import environ
 
 from fastapi import HTTPException, Depends, status, Header
 from OpenSSL import crypto
@@ -43,29 +42,10 @@ class GeneralNames(univ.SequenceOf):
     componentType = GeneralName()
 
 
-api_key_header = APIKeyHeader(name="X-API-Key")
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
-def get_api_key(api_key: str = Depends(api_key_header)) -> str:
-    """
-    Validates the API key provided in the request header.
-
-    Args:
-        api_key (str): The API key extracted from the request header.
-
-    Returns:
-        str: The validated API key.
-
-    Raises:
-        HTTPException: If the API key is invalid or missing.
-    """
-    if api_key is None or api_key != environ.get("API_KEY"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-    return api_key
 
 
 def allow_unsigned_certificate() -> ssl.SSLContext:
@@ -214,12 +194,7 @@ def get_domains_recursive(
 @app.get("/ssl_domains/{hostname}")
 @limiter.limit("300/minute")
 def get_ssl_domains(
-    request: Request,
-    hostname: str,
-    recursive: bool = False,
-    port: int = 443,
-    timeout: int = 5,
-    api_key: str = Depends(get_api_key),
+    request: Request, hostname: str, recursive: bool = False, port: int = 443, timeout: int = 5
 ) -> dict:
     """
     Retrieve SSL domains for a given hostname.
@@ -229,7 +204,6 @@ def get_ssl_domains(
     The `recursive` parameter is optional and determines whether to recursively search for SSL domains.
     The `port` parameter is optional and specifies the port to use for the SSL connection (default is 443).
     The `timeout` parameter is optional and sets the timeout for the SSL connection (default is 5 seconds).
-    The `api_key` parameter is optional and represents the API key for authentication.
 
     Returns:
         A JSON containing the list of SSL domains.
