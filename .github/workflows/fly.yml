@@ -4,8 +4,7 @@ on:
     branches:
       - main
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize, reopened]
 jobs:
   test:
     name: Run pytest
@@ -27,8 +26,8 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
   deploy:
     name: Deploy app
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     concurrency: deploy-group
     steps:
