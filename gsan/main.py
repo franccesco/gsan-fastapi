@@ -210,4 +210,4 @@ def get_ssl_domains(
     """
     seen_domains = set()
     domains = get_domains_recursive(hostname, port, seen_domains, timeout, recursive)
-    return {"domains": domains}
+    return {hostname: domains}

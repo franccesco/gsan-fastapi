@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from gsan import app
 
 client = TestClient(app)
-api_key_header = {"X-API-KEY": environ.get("API_KEY")}
 
 
 def test_read_main():
@@ -13,6 +12,7 @@ def test_read_main():
 
 
 def test_get_ssl_domains():
-    response = client.get("/ssl_domains/self-signed.badssl.com", headers=api_key_header)
-    assert response.json() == {"domains": ["badssl.com"]}
+    domain = "self-signed.badssl.com"
+    response = client.get(f"/ssl_domains/{domain}")
+    assert response.json() == {domain: ["badssl.com"]}
     assert response.status_code == 200
