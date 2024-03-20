@@ -16,3 +16,9 @@ def test_get_ssl_domains():
     response = client.get(f"/ssl_domains/{domain}")
     assert response.json() == {domain: ["badssl.com"]}
     assert response.status_code == 200
+
+
+def test_get_homepage():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json()["version"] == "0.1.0"
