@@ -12,6 +12,7 @@ def test_read_main():
 
 
 def test_get_ssl_domains():
-    response = client.get("/ssl_domains/self-signed.badssl.com")
-    assert response.json() == {"domains": ["badssl.com"]}
+    domain = "self-signed.badssl.com"
+    response = client.get(f"/ssl_domains/{domain}")
+    assert response.json() == {domain: ["badssl.com"]}
     assert response.status_code == 200
