@@ -211,3 +211,15 @@ def get_ssl_domains(
     seen_domains = set()
     domains = get_domains_recursive(hostname, port, seen_domains, timeout, recursive)
     return {hostname: domains}
+
+
+@app.get("/")
+def get_home():
+    return {
+        "welcome_message": "Welcome to GSAN (Get SubjAltName) API!",
+        "instructions": "To use this API, make a GET request to /ssl_domains/{hostname} endpoint. Provide the target hostname as a path parameter. For more information you can go to /docs or /redoc.",
+        "about": "This API retrieves SSL domains associated with a given hostname. It uses the subjectAltName extension of the X.509 certificate to extract subdomains and IP addresses.",
+        "limitations": "This API is rate-limited to 300 requests per minute. If the rate limit is exceeded, a 429 Too Many Requests response will be returned.",
+        "disclaimer": "This API is for educational and informational purposes only. Use of this API is meant to demonstrate SSL domain extraction and should not be used for any malicious or harmful activities. All requests are logged for security and monitoring purposes.",
+        "version": "0.1.0",
+    }

@@ -6,9 +6,10 @@ from gsan import app
 client = TestClient(app)
 
 
-def test_read_main():
+def test_get_homepage():
     response = client.get("/")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json()["version"] == "0.1.0"
 
 
 def test_get_ssl_domains():
