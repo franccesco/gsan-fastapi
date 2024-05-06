@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import ssl
 import socket
 
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import HTTPException, Depends, status, Header
 from pydantic import BaseModel
 from OpenSSL import crypto
@@ -72,6 +73,17 @@ def allow_unsigned_certificate() -> ssl.SSLContext:
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     return context
+
+
+def get_hostname_and_port(hostname, default_port):
+    """
+    Split the hostname and port if specified, otherwise use the default port.
+    """
+    if ":" in hostname:
+        hostname, port = hostname.split(":")
+        return hostname, int(port)
+    else:
+        return hostname, default_port
 
 
 def clean_domains(domains: list) -> list:
@@ -224,6 +236,30 @@ def get_ssl_domains(
     seen_domains = set()
     domains = get_domains_recursive(hostname, port, seen_domains, timeout, recursive)
     return {hostname: domains}
+
+
+@app.post("/ssl_domains/bulk")
+@limiter.limit("300/minute")
+def get_bulk_ssl_domains(request: Request, hostnames: Parameters) -> dict:
+    bulk_results = {}
+    failed_requests = []
+
+    def process_hostname(hostname):
+        hostname, port = get_hostname_and_port(hostname, hostnames.ssl_port)
+        timeout = hostnames.timeout
+        seen_domains = set()
+        try:
+            domains = get_domains_recursive(hostname, port, seen_domains, timeout, recursive=False)
+        except HTTPException as e:
+            failed_requests.append(hostname)
+            return
+        bulk_results[hostname] = domains
+
+    with ThreadPoolExecutor() as executor:
+        executor.map(process_hostname, hostnames.hostnames)
+
+    data = {"domains_found": bulk_results, "failed_requests": failed_requests}
+    return data
 
 
 @app.get("/")
