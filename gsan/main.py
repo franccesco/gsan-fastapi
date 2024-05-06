@@ -3,6 +3,7 @@ import ssl
 import socket
 
 from fastapi import HTTPException, Depends, status, Header
+from pydantic import BaseModel
 from OpenSSL import crypto
 from pyasn1.codec.der import decoder
 from pyasn1.type import univ, char, namedtype, namedval, tag, constraint, useful
@@ -40,6 +41,18 @@ class GeneralName(univ.Choice):
 
 class GeneralNames(univ.SequenceOf):
     componentType = GeneralName()
+
+
+class Parameters(BaseModel):
+    """
+    Pydantic model for the list of hostnames. Used in the POST request for bulk SSL domain retrieval.
+
+    A list of hostnames is expected in the request body: {"hostnames": ["example.com:port", "sub.example.com"]}.
+    """
+
+    hostnames: List[str]
+    ssl_port: int = 443
+    timeout: int = 5
 
 
 limiter = Limiter(key_func=get_remote_address)
