@@ -4,6 +4,7 @@ import socket
 
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import HTTPException, Depends, status, Header
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from OpenSSL import crypto
 from pyasn1.codec.der import decoder
@@ -60,6 +61,9 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Set up the Jinja2 templates environment
+templates = Jinja2Templates(directory="gsan/templates")
 
 
 def allow_unsigned_certificate() -> ssl.SSLContext:
@@ -263,12 +267,5 @@ def get_bulk_ssl_domains(request: Request, hostnames: Parameters) -> dict:
 
 
 @app.get("/")
-def get_home():
-    return {
-        "welcome_message": "Welcome to GSAN (Get SubjAltName) API!",
-        "instructions": "To use this API, make a GET request to /ssl_domains/{hostname} endpoint. Provide the target hostname as a path parameter. For more information you can go to /docs or /redoc.",
-        "about": "This API retrieves SSL domains associated with a given hostname. It uses the subjectAltName extension of the X.509 certificate to extract subdomains and IP addresses.",
-        "limitations": "This API is rate-limited to 300 requests per minute. If the rate limit is exceeded, a 429 Too Many Requests response will be returned.",
-        "disclaimer": "This API is for educational and informational purposes only. Use of this API is meant to demonstrate SSL domain extraction and should not be used for any malicious or harmful activities. All requests are logged for security and monitoring purposes.",
-        "version": "0.1.0",
-    }
+def get_home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})

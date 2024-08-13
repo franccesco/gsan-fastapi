@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>GSAN: Subdomain Search</title>
+        <style>
+            #domainInput,
+            #multipleDomainsInput {
+                display: none;
+                margin-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Welcome to GSAN (Get SubjAltName)</h1>
+        <p>
+            GSAN retrieves SSL domains associated with a given hostname. It uses
+            the subjectAltName extension of the X.509 found in HTTPS
+            certificates to extract subdomains and IP addresses.
+        </p>
+        <p>
+            Unlike other subdomain search tools like CRT.SH or dnsmap, GSAN does
+            not rely on DNS search or cares about certificate transparency. It
+            creates a direct connection to the HTTPS service and tries to look
+            for subdomain names.
+        </p>
+        <p>
+            This API is for educational and informational purposes only. Use of
+            this API is meant to demonstrate SSL domain extraction and should
+            not be used for any malicious or harmful activities.
+        </p>
+
+        <p>
+            Try it out yourself 👇🏻 or go to
+            <strong><a href="/docs">/docs</a></strong>
+            to see the API documentation. Have a question?
+            <strong
+                ><a href="https://x.com/__franccesco"
+                    >Follow me on Twitter.</a
+                ></strong
+            >
+            (FYI: This is not customer support, but I'm happy to chat!)
+        </p>
+
+        <form id="domainForm">
+            <label>
+                <input type="radio" name="scanType" value="single" checked />
+                Single Domain
+            </label>
+            <label>
+                <input type="radio" name="scanType" value="multiple" />
+                Multiple Domains
+            </label>
+
+            <div id="domainInput">
+                <label for="domain">Domain or IP address:</label>
+                <input
+                    type="text"
+                    id="domain"
+                    name="domain"
+                    value="microsoft.com"
+                    required
+                />
+            </div>
+
+            <div id="multipleDomainsInput">
+                <label for="multipleDomains"
+                    >Enter domains (one per line):</label
+                >
+                <textarea
+                    id="multipleDomains"
+                    name="multipleDomains"
+                    rows="5"
+                    cols="40"
+                >
+google.com
+youtube.com
+facebook.com
+baidu.com
+yahoo.com
+amazon.com
+wikipedia.org
+google.co.in
+twitter.com
+qq.com
+live.com
+taobao.com
+bing.com
+google.co.jp
+msn.com</textarea
+                >
+            </div>
+
+            <button type="submit">Search</button>
+        </form>
+
+        <h2>Results:</h2>
+        <div id="results"></div>
+
+        <script>
+            // Handle radio button changes
+            document
+                .querySelectorAll('input[name="scanType"]')
+                .forEach((radio) => {
+                    radio.addEventListener("change", function () {
+                        if (this.value === "single") {
+                            document.getElementById(
+                                "domainInput",
+                            ).style.display = "block";
+                            document.getElementById(
+                                "multipleDomainsInput",
+                            ).style.display = "none";
+                        } else {
+                            document.getElementById(
+                                "domainInput",
+                            ).style.display = "none";
+                            document.getElementById(
+                                "multipleDomainsInput",
+                            ).style.display = "block";
+                        }
+                    });
+                });
+
+            // Set initial visibility
+            document.getElementById("domainInput").style.display = "block";
+
+            document
+                .getElementById("domainForm")
+                .addEventListener("submit", function (event) {
+                    event.preventDefault(); // Prevent the form from submitting the traditional way
+
+                    const scanType = document.querySelector(
+                        'input[name="scanType"]:checked',
+                    ).value;
+                    const resultsDiv = document.getElementById("results");
+                    resultsDiv.innerHTML = ""; // Clear previous results
+
+                    if (scanType === "single") {
+                        const domain = document
+                            .getElementById("domain")
+                            .value.trim();
+                        const url = `/ssl_domains/${encodeURIComponent(domain)}`;
+
+                        fetch(url, {
+                            method: "GET",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        })
+                            .then((response) => {
+                                if (!response.ok) {
+                                    return response.json().then((errorData) => {
+                                        throw new Error(
+                                            errorData.detail || "Unknown error",
+                                        );
+                                    });
+                                }
+                                return response.json();
+                            })
+                            .then((data) => {
+                                const domainKey = Object.keys(data)[0];
+                                const subdomains = data[domainKey];
+
+                                if (Array.isArray(subdomains)) {
+                                    const domainHeader =
+                                        document.createElement("h3");
+                                    domainHeader.textContent = `Subdomains for ${domainKey}:`;
+                                    resultsDiv.appendChild(domainHeader);
+
+                                    const ul = document.createElement("ul");
+                                    subdomains.forEach((subdomain) => {
+                                        const li = document.createElement("li");
+                                        li.textContent = subdomain;
+                                        ul.appendChild(li);
+                                    });
+
+                                    resultsDiv.appendChild(ul);
+                                } else {
+                                    throw new Error(
+                                        "Subdomains data is not in the expected format.",
+                                    );
+                                }
+                            })
+                            .catch((error) => {
+                                const errorMessage =
+                                    document.createElement("p");
+                                errorMessage.textContent =
+                                    "Error: " +
+                                    error.message +
+                                    ". Maybe the service is down?.";
+                                errorMessage.style.color = "red";
+                                resultsDiv.appendChild(errorMessage);
+                            });
+                    } else if (scanType === "multiple") {
+                        const domains = document
+                            .getElementById("multipleDomains")
+                            .value.split("\n")
+                            .map((domain) => domain.trim()) // Trim each line
+                            .filter((domain) => domain.length > 0); // Remove empty lines;
+                        const requestBody = {
+                            hostnames: domains,
+                            ssl_port: 443,
+                            timeout: 5,
+                        };
+
+                        fetch("/ssl_domains/bulk", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(requestBody),
+                        })
+                            .then((response) => {
+                                if (!response.ok) {
+                                    return response.json().then((errorData) => {
+                                        throw new Error(
+                                            errorData.detail || "Unknown error",
+                                        );
+                                    });
+                                }
+                                return response.json();
+                            })
+                            .then((data) => {
+                                const domainsFound = data.domains_found;
+                                const failedRequests = data.failed_requests;
+
+                                for (const [
+                                    domainKey,
+                                    subdomains,
+                                ] of Object.entries(domainsFound)) {
+                                    const domainHeader =
+                                        document.createElement("h3");
+                                    domainHeader.textContent = `Subdomains for ${domainKey}:`;
+                                    resultsDiv.appendChild(domainHeader);
+
+                                    const ul = document.createElement("ul");
+                                    subdomains.forEach((subdomain) => {
+                                        const li = document.createElement("li");
+                                        li.textContent = subdomain;
+                                        ul.appendChild(li);
+                                    });
+
+                                    resultsDiv.appendChild(ul);
+                                }
+
+                                if (failedRequests.length > 0) {
+                                    const failedHeader =
+                                        document.createElement("h3");
+                                    failedHeader.textContent =
+                                        "Failed Requests:";
+                                    resultsDiv.appendChild(failedHeader);
+
+                                    const ul = document.createElement("ul");
+                                    failedRequests.forEach((failedDomain) => {
+                                        const li = document.createElement("li");
+                                        li.textContent = failedDomain;
+                                        ul.appendChild(li);
+                                    });
+
+                                    resultsDiv.appendChild(ul);
+                                }
+                            })
+                            .catch((error) => {
+                                const errorMessage =
+                                    document.createElement("p");
+                                errorMessage.textContent =
+                                    "Error: " +
+                                    error.message +
+                                    ". Maybe the service is down?.";
+                                errorMessage.style.color = "red";
+                                resultsDiv.appendChild(errorMessage);
+                            });
+                    }
+                });
+        </script>
+    </body>
+</html>
