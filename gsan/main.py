@@ -134,7 +134,7 @@ def get_certificate(hostname: str, port: int, timeout: int) -> crypto.X509:
 
                 return x509
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
 
 
 def extract_subdomains(x509: crypto.X509) -> list:
@@ -174,11 +174,11 @@ def extract_subdomains(x509: crypto.X509) -> list:
 
         return subdomains
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
 
 
 def get_domains_recursive(
-    hostname: str, port: int, seen_domains: Set[str], timeout: float, recursive: bool
+    hostname: str, port: int, seen_domains: Set[str], timeout: int, recursive: bool
 ) -> List[str]:
     """
     Recursively retrieves subdomains from a given hostname.
